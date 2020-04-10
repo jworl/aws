@@ -25,7 +25,7 @@ if [[ ${SNSTATE} != "available" ]]; then
     echo "${AVZN} is ${SNSTATE}"; exit 2
 else
     SNID=$(echo ${SUBNET} | jq -r .Subnets[].SubnetId)
-    echo "${AVZN} subnet-id is ${SNID}"
+    echo "${AVZN} subnet-id: ${SNID}"
 fi
 
 SGMGMT=`${EC2} describe-security-groups ${ACCT} --filters "Name=group-name,Values=panos-mgmt"`
@@ -33,11 +33,29 @@ if [[ $(_EXISTS "${SGMGMT}" "SecurityGroups") -eq 1 ]]; then
     echo "missing SG for MGMT"; exit 2
 else
     SGMGMTID=$(echo ${SGMGMT} | jq -r .SecurityGroups[].GroupId)
-    echo "GroupId for MGMT is ${SGMGMTID}"
+    echo "GroupId for MGMT: ${SGMGMTID}"
 fi
 
 SGGP=`${EC2} describe-security-groups ${ACCT} --filters "Name=group-name,Values=globalprotect"`
-if [[ $(_EXISTS "${SGGP}" "SecurityGroups") -eq 1 ]]; then echo "missing SG for GlobalProtect"; exit 2; fi
+if [[ $(_EXISTS "${SGGP}" "SecurityGroups") -eq 1 ]]; then
+    echo "missing SG for GlobalProtect"; exit 2
+else
+    SGGPID=$(echo ${SGGP} | jq -r .SecurityGroups[].GroupId)
+    echo "GroupId for GlobalProtect: ${SGGPID}"
+fi
 
 NIMGMT=`${EC2} describe-network-interfaces ${ACCT} --filters "Name=availability-zone,Values=${AVZN}" "Name=group-id,Values=${SGMGMTID}"`
-echo ${NIMGMT} | jq .
+if [[ $(_EXISTS "${NIMGMT}" "NetworkInterfaces") -eq 1 ]]; then
+    echo "missing NetworkInterface for MGMT"; exit 2
+else
+    NIMGMTID=$(echo ${NIMGMT} | jq -r ".NetworkInterfaces[].NetworkInterfaceId")
+    echo "NetworkInterfaceID for MGMT: ${NIMGMTID}"
+fi
+
+NIGP=`${EC2} describe-network-interfaces ${ACCT} --filters "Name=availability-zone,Values=${AVZN}" "Name=group-id,Values=${SGGPID}"`
+if [[ $(_EXISTS "${NIGP}" "NetworkInterfaces") -eq 1 ]]; then
+    echo "missing NetworkInterface for MGMT"; exit 2
+else
+    NIGPID=$(echo ${NIGP} | jq -r ".NetworkInterfaces[].NetworkInterfaceId")
+    echo "NetworkInterfaceID for GlobalProtect: ${NIGPID}"
+fi
